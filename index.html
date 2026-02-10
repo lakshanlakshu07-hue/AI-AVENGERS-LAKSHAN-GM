@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parking Availability App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .slot-card {
+            transition: all 0.3s ease;
+        }
+        .slot-card:hover {
+            transform: translateY(-2px);
+        }
+        .available {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .occupied {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🚗 Parking Availability App</h1>
+            <p class="text-gray-600">Manage your parking slots efficiently</p>
+        </header>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Parking Status Section -->
+            <section class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Parking Status</h2>
+                <div id="parking-slots" class="grid grid-cols-2 gap-4">
+                    <!-- Slots will be populated here -->
+                </div>
+                <div class="mt-4 text-center">
+                    <button onclick="refreshStatus()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                        🔄 Refresh Status
+                    </button>
+                </div>
+            </section>
+
+            <!-- Control Panel Section -->
+            <section class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-800">Control Panel</h2>
+                
+                <!-- Park Vehicle Form -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-2 text-gray-700">Park Vehicle</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="park-vehicle-input" placeholder="Enter vehicle number" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="parkVehicle()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                            🅿️ Park
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Remove Vehicle Form -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-medium mb-2 text-gray-700">Remove Vehicle</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="remove-vehicle-input" placeholder="Enter vehicle number" 
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500">
+                        <button onclick="removeVehicle()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                            🚪 Remove
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Message Display -->
+                <div id="message" class="hidden p-4 rounded-md mb-4"></div>
+            </section>
+        </div>
+
+        <!-- Statistics Section -->
+        <section class="mt-8 bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Statistics</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-blue-600" id="total-slots">5</div>
+                    <div class="text-gray-600">Total Slots</div>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-green-600" id="available-slots">5</div>
+                    <div class="text-gray-600">Available</div>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <div class="text-3xl font-bold text-red-600" id="occupied-slots">0</div>
+                    <div class="text-gray-600">Occupied</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Load parking status on page load
+        document.addEventListener('DOMContentLoaded', refreshStatus);
+
+        // Auto-refresh every 5 seconds
+        setInterval(refreshStatus, 5000);
+
+        function refreshStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(slots => {
+                    displaySlots(slots);
+                    updateStatistics(slots);
+                })
+                .catch(error => {
+                    showMessage('Error loading parking status', 'error');
+                });
+        }
+
+        function displaySlots(slots) {
+            const container = document.getElementById('parking-slots');
+            container.innerHTML = '';
+
+            slots.forEach(slot => {
+                const slotCard = document.createElement('div');
+                slotCard.className = `slot-card p-4 rounded-lg text-white font-semibold text-center ${
+                    slot.available ? 'available' : 'occupied'
+                }`;
+                
+                slotCard.innerHTML = `
+                    <div class="text-lg mb-2">Slot ${slot.slot}</div>
+                    <div class="text-sm">
+                        ${slot.available ? 
+                            '<span class="text-green-100">✓ Available</span>' : 
+                            `<span class="text-red-100">🚗 ${slot.vehicle}</span>`
+                        }
+                    </div>
+                `;
+                
+                container.appendChild(slotCard);
+            });
+        }
+
+        function updateStatistics(slots) {
+            const total = slots.length;
+            const available = slots.filter(slot => slot.available).length;
+            const occupied = total - available;
+
+            document.getElementById('total-slots').textContent = total;
+            document.getElementById('available-slots').textContent = available;
+            document.getElementById('occupied-slots').textContent = occupied;
+        }
+
+        function parkVehicle() {
+            const vehicleNumber = document.getElementById('park-vehicle-input').value.trim();
+            
+            if (!vehicleNumber) {
+                showMessage('Please enter a vehicle number', 'error');
+                return;
+            }
+
+            fetch('/api/park', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ vehicle_number: vehicleNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    document.getElementById('park-vehicle-input').value = '';
+                    refreshStatus();
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error parking vehicle', 'error');
+            });
+        }
+
+        function removeVehicle() {
+            const vehicleNumber = document.getElementById('remove-vehicle-input').value.trim();
+            
+            if (!vehicleNumber) {
+                showMessage('Please enter a vehicle number', 'error');
+                return;
+            }
+
+            fetch('/api/remove', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ vehicle_number: vehicleNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    document.getElementById('remove-vehicle-input').value = '';
+                    refreshStatus();
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error removing vehicle', 'error');
+            });
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `p-4 rounded-md mb-4 ${
+                type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : 
+                'bg-red-100 text-red-700 border border-red-300'
+            }`;
+            messageDiv.classList.remove('hidden');
+
+            // Hide message after 3 seconds
+            setTimeout(() => {
+                messageDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Handle Enter key press in input fields
+        document.getElementById('park-vehicle-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') parkVehicle();
+        });
+
+        document.getElementById('remove-vehicle-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') removeVehicle();
+        });
+    </script>
+</body>
+</html>
